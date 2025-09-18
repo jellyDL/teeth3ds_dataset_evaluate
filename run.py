@@ -75,48 +75,64 @@ def num_to_fdi(num_labels):
 
 if __name__ == "__main__":
     
-    raw_data_dir = "../data_part_5/upper"
-    out_data_dir = "../data_part_5_proc/upper_proc"
+    raw_data_dirs = ["../data_part_5/upper", "../data_part_6/upper"]
+    out_data_dirs = ["../data_part_5_proc/upper_proc", "../data_part_6_proc/upper_proc"]
     
     total_accuracy = 0
     total_num = 0
-    for iter, folder in enumerate(os.listdir(raw_data_dir)):
+    
+    # 处理所有目录下的数据
+    for dir_idx, raw_data_dir in enumerate(raw_data_dirs):
+        out_data_dir = out_data_dirs[dir_idx]
         
-        if iter % 10 == 0:
-            print("Processing {}/{}...".format(iter, len(os.listdir(raw_data_dir))))
+        folder_list = os.listdir(raw_data_dir)
+        total_folders = len(folder_list)
         
-        folder_path = os.path.join(raw_data_dir, folder)
-        print(f"Processing folder: {folder_path}")
-        if os.path.isdir(folder_path):
+        for iter, folder in enumerate(folder_list):
+            
+            if iter % 10 == 0:
+                print("Processing {}/{} in {}...".format(iter, total_folders, raw_data_dir))
+            
+            folder_path = os.path.join(raw_data_dir, folder)
+            if not os.path.isdir(folder_path):
+                continue
+                
+            # 查找json文件
+            json_found = False
             for file in os.listdir(folder_path):
                 if file.endswith(".json"):
                     label_file = os.path.join(folder_path, file)
-                    jaw_type, fdi_labels, ins_labels = parse_json(label_file)  # 更新变量名
+                    jaw_type, fdi_labels, ins_labels = parse_json(label_file)
+                    json_found = True
+                    break
+            
+            if not json_found:
+                continue
                     
-        pred_file = os.path.join(out_data_dir, folder + "_" + jaw_type + "_label.ply")  # 更新变量名
-        # 读取predfile顶点的所有颜色
-        vertices_colors, vertices_points = read_ply_vertices_colors(pred_file)
-        vertices_num_labels = colors_to_labels(vertices_colors)        
-        vertices_fdi_labels = num_to_fdi(vertices_num_labels)
-        
-        if len(vertices_num_labels) != len(fdi_labels):
-            continue
-        
-        if 0:
-            print("Vertices num labels:", len(vertices_num_labels))
-            print("Vertices fdi labels:", len(vertices_fdi_labels))
-            print("GT fdi labels:", len(fdi_labels))
-            print("GT ins labels:", len(ins_labels))
+            pred_file = os.path.join(out_data_dir, folder + "_" + jaw_type + "_label.ply")
+            if not os.path.exists(pred_file):
+                continue
+                
+            # 读取predfile顶点的所有颜色
+            result = read_ply_vertices_colors(pred_file)
+            if result is None:
+                continue
+                
+            vertices_colors, vertices_points = result
+            vertices_num_labels = colors_to_labels(vertices_colors)
+            vertices_fdi_labels = num_to_fdi(vertices_num_labels)
             
+            if len(vertices_num_labels) != len(fdi_labels):
+                continue
             
-        # Calculate IoU (Intersection over Union)
-        correct_predictions = np.sum(np.array(vertices_fdi_labels) == np.array(fdi_labels))
-        total_points = len(vertices_fdi_labels)
-        accuracy = correct_predictions / total_points
-        
-        total_accuracy += accuracy
-        total_num += 1
+            # 计算准确率
+            correct_predictions = np.sum(np.array(vertices_fdi_labels) == np.array(fdi_labels))
+            total_points = len(vertices_fdi_labels)
+            accuracy = correct_predictions / total_points
+            
+            total_accuracy += accuracy
+            total_num += 1
     
     print("total_num: ", total_num)
-    print("Over all Results:", total_accuracy / total_num)
+    print("Over all Results:", total_accuracy / total_num if total_num > 0 else "No valid data processed")
 
