@@ -1,0 +1,122 @@
+import os
+import sys
+import json
+import numpy as np
+
+color_trans_table = [
+    [1.0, 1.0, 1.0], [1.0, 0.6, 0.0], [1.0, 1.0, 0.8], [0.4, 0.8, 0.6],
+	[0.5, 0.9, 0.0], [0.0, 0.0, 0.8], [0.3, 0.2, 0.5], [1.0, 0.8, 0.7],
+	[0.8, 0.3, 0.3], [0.8, 0.5, 0.0], [1.0, 1.0, 0.0], [0.5, 1.0, 0.8],
+	[0.0, 1.0, 0.2], [0.1, 0.5, 1.0], [0.4, 0.3, 0.8], [1.0, 0.9, 0.7],
+    [0.5, 0.2, 0.2], [1.0, 0.5, 0.0], [1.0, 0.8, 0.0], [0.0, 0.4, 0.0],
+    [0.8, 1.0, 0.8], [0.0, 0.7, 1.0], [0.5, 0.4, 1.0], [0.5, 0.5, 0.4],
+    [0.9, 0.3, 0.2], [1.0, 0.6, 0.0], [0.8, 0.6, 0.1], [0.3, 0.4, 0.2],
+    [0.8, 1.0, 0.4], [0.3, 0.5, 0.7], [0.6, 0.0, 0.8], [0.8, 0.7, 0.6],
+    [1.0, 0.0, 0.6], [1.0, 0.7, 0.8], [0.7, 0.5, 0.0], [0.6, 0.7, 0.5]
+]
+
+# 添加PLY文件处理库
+try:
+    import open3d as o3d
+except ImportError:
+    print("请安装open3d库: pip install open3d")
+    sys.exit(1)
+
+def parse_json(label_file):
+    # Read the JSON file
+    with open(label_file, 'r') as f:
+        data = json.load(f)
+        fdi_labels = data.get('labels', []) # FDI
+        ins_labels = data.get('instances', []) # FDI
+        jaw_type = data.get('jaw')  # 修改变量名，避免与内置函数type冲突
+    return jaw_type, fdi_labels, ins_labels
+
+def read_ply_vertices_colors(ply_file):
+    """读取PLY文件中顶点的颜色信息"""
+    if not os.path.exists(ply_file):
+        print(f"文件不存在: {ply_file}")
+        return None
+    
+    try:
+        # 使用open3d读取PLY文件
+        pcd = o3d.io.read_point_cloud(ply_file)
+        # 获取顶点颜色，转换为numpy数组
+        colors = np.asarray(pcd.colors)
+        vertices = np.asarray(pcd.points)
+        return colors, vertices
+    except Exception as e:
+        print(f"读取PLY文件时出错: {e}")
+        return None
+
+def colors_to_labels(colors):
+    """将颜色转换为标签"""
+    labels = []
+    for color in colors:
+        color = np.round(color, 2).tolist()
+        # 如果color 在color_trans_table中，将其索引作为标签
+        if color in color_trans_table:
+            labels.append(color_trans_table.index(color))
+        else:
+            print("LLLLLLLLLLL")
+    
+    return np.array(labels)
+
+def num_to_fdi(num_labels):
+    fidnum = []
+    for num in num_labels:
+        if num >= 1 and num <= 9:
+            fidnum.append(20 - num)
+        elif num >= 10 and num <= 28:
+            fidnum.append(num + 11)
+        else:
+            fidnum.append(num)
+    return fidnum
+            
+
+if __name__ == "__main__":
+    
+    raw_data_dir = "../data_part_5/upper"
+    out_data_dir = "../data_part_5_proc/upper_proc"
+    
+    total_accuracy = 0
+    total_num = 0
+    for iter, folder in enumerate(os.listdir(raw_data_dir)):
+        
+        if iter % 10 == 0:
+            print("Processing {}/{}...".format(iter, len(os.listdir(raw_data_dir))))
+        
+        folder_path = os.path.join(raw_data_dir, folder)
+        print(f"Processing folder: {folder_path}")
+        if os.path.isdir(folder_path):
+            for file in os.listdir(folder_path):
+                if file.endswith(".json"):
+                    label_file = os.path.join(folder_path, file)
+                    jaw_type, fdi_labels, ins_labels = parse_json(label_file)  # 更新变量名
+                    
+        pred_file = os.path.join(out_data_dir, folder + "_" + jaw_type + "_label.ply")  # 更新变量名
+        # 读取predfile顶点的所有颜色
+        vertices_colors, vertices_points = read_ply_vertices_colors(pred_file)
+        vertices_num_labels = colors_to_labels(vertices_colors)        
+        vertices_fdi_labels = num_to_fdi(vertices_num_labels)
+        
+        if len(vertices_num_labels) != len(fdi_labels):
+            continue
+        
+        if 0:
+            print("Vertices num labels:", len(vertices_num_labels))
+            print("Vertices fdi labels:", len(vertices_fdi_labels))
+            print("GT fdi labels:", len(fdi_labels))
+            print("GT ins labels:", len(ins_labels))
+            
+            
+        # Calculate IoU (Intersection over Union)
+        correct_predictions = np.sum(np.array(vertices_fdi_labels) == np.array(fdi_labels))
+        total_points = len(vertices_fdi_labels)
+        accuracy = correct_predictions / total_points
+        
+        total_accuracy += accuracy
+        total_num += 1
+    
+    print("total_num: ", total_num)
+    print("Over all Results:", total_accuracy / total_num)
+
