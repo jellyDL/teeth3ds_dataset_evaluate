@@ -64,10 +64,15 @@ def colors_to_labels(colors):
 def num_to_fdi(num_labels):
     fidnum = []
     for num in num_labels:
-        if num >= 1 and num <= 9:
+        num = int(num)
+        if num >= 2 and num <= 9:
             fidnum.append(20 - num)
-        elif num >= 10 and num <= 28:
+        elif num >= 10 and num <= 17:
             fidnum.append(num + 11)
+        elif num >= 18 and num <= 25:
+            fidnum.append(56 - num)
+        elif num >= 26 and num <= 33:
+            fidnum.append(num + 15)
         else:
             fidnum.append(num)
     return fidnum
@@ -75,8 +80,13 @@ def num_to_fdi(num_labels):
 
 if __name__ == "__main__":
     
-    raw_data_dirs = ["../data_part_5/upper", "../data_part_6/upper"]
-    out_data_dirs = ["../data_part_5_proc/upper_proc", "../data_part_6_proc/upper_proc"]
+    raw_data_dirs = ["../data_part_5/upper", "../data_part_5/lower", \
+        "../data_part_6/upper", "../data_part_5/lower", "../data_part_6/lower"]
+    out_data_dirs = ["../data_part_5_proc/upper_proc", "../data_part_5_proc/lower_proc" \
+        "../data_part_6_proc/upper_proc",,"../data_part_6_proc/lower_proc"]
+    
+    # raw_data_dirs = ["../data_part_5/lower"]
+    # out_data_dirs = ["../data_part_5_proc/lower_proc"]
     
     total_accuracy = 0
     total_num = 0
@@ -91,7 +101,7 @@ if __name__ == "__main__":
         for iter, folder in enumerate(folder_list):
             
             if iter % 10 == 0:
-                print("Processing {}/{} in {}...".format(iter, total_folders, raw_data_dir))
+                print("Processing {}/{} in {} :  {}...".format(iter, total_folders, raw_data_dir, folder))
             
             folder_path = os.path.join(raw_data_dir, folder)
             if not os.path.isdir(folder_path):
@@ -121,6 +131,14 @@ if __name__ == "__main__":
             vertices_colors, vertices_points = result
             vertices_num_labels = colors_to_labels(vertices_colors)
             vertices_fdi_labels = num_to_fdi(vertices_num_labels)
+             
+            # print("## ",len(vertices_fdi_labels), len(fdi_labels))
+            # a = 3000
+            # b = a+20
+            # print(vertices_num_labels[a:b])
+            # print(vertices_fdi_labels[a:b])
+            # print(fdi_labels[a:b])
+            
             
             if len(vertices_num_labels) != len(fdi_labels):
                 continue
